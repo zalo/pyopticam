@@ -6,7 +6,7 @@ import pyopticam as m
 
 class OptitrackThread(threading.Thread):
     '''A thread for receiving images from the Optitrack SDK'''
-    def __init__(self, mode=m.eVideoMode.MJPEGMode, exposure=50, delay_strobe=False, framerate=-1):
+    def __init__(self, mode=m.eVideoMode.SegmentMode, exposure=50, delay_strobe=False, framerate=-1):
         '''Initialize Optitrack Receptiom'''
         threading.Thread.__init__(self)
         self.should_run = True
@@ -74,11 +74,13 @@ class OptitrackThread(threading.Thread):
             print("Setting", self.mode)
             self.camera_array[i].SetVideoType(self.mode) # and GrayscaleMode work
 
+            self.camera_array[i].SetThreshold(10)
+
             print("Starting Camera...")
             self.camera_array[i].Start()
             if self.mode != m.eVideoMode.GrayscaleMode:
                 self.camera_array[i].SetExposure(self.exposure)
-                self.camera_array[i].SetIntensity(5)
+                self.camera_array[i].SetIntensity(15)
                 self.camera_array[i].SetImagerGain(m.eImagerGain.Gain_Level7)
                 #self.camera_array[i].SetFrameDecimation(1)
                 print("Minimum Frame Rate:", self.camera_array[i].MinimumFrameRateValue())
@@ -103,6 +105,15 @@ class OptitrackThread(threading.Thread):
         elif self.mode == m.eVideoMode.ObjectMode:
             new_frame = m.GetFrameGroupObjectArray(self.sync)
             new_frame = np.nan_to_num(new_frame, nan=0.0)
+        elif self.mode == m.eVideoMode.SegmentMode:
+            width = 1280; height = 1024
+            current_framegroup = m.GetFrameGroup(self.sync)
+            if current_framegroup.Count() > 0:
+                current_frame = current_framegroup.GetFrame(0)
+                width = current_frame.Width(); height = current_frame.Width()
+            new_frame = np.zeros((current_framegroup.Count(), height, width), dtype=np.uint8)
+            #print("Rasterizing Tensor from Frame Group...")
+            m.RasterizeTensorFromFrameGroup(self.camera_array[0], current_framegroup, new_frame)
         else:
             current_framegroup = m.GetFrameGroup(self.sync)
             new_frame = np.zeros((current_framegroup.Count(), self.camera_array[0].Height(), self.camera_array[0].Width()), dtype=np.uint8)

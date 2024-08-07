@@ -247,6 +247,27 @@ NB_MODULE(pyopticam_ext, m) {
         nanobind::gil_scoped_acquire acquire;
     });
 
+    m.def("RasterizeTensorFromFrameGroup", [](std::shared_ptr<Camera> camera, std::shared_ptr<FrameGroup> frameGroup, nb::ndarray<nb::numpy> ndarray) { //,uint8_t, nb::shape<8, 1024, 1280>, nb::c_contig, nb::device::cpu
+        nanobind::gil_scoped_release release;
+
+        if(frameGroup && frameGroup != nullptr && frameGroup->Count() > 0 ){
+            int count = frameGroup->Count();
+            uint8_t* full_buffer = (uint8_t*)ndarray.data();
+            for(int i = 0; i < count; i++){
+                std::shared_ptr<const Frame> frame = frameGroup->GetFrame(i);
+                if(!(frame->IsInvalid())){
+                    //printf("[INFO] Frame Width/Height; Width = %i, Height = %i\n", frame->Width(), frame->Height());
+                    frame->Rasterize(*camera, ndarray.shape(2), ndarray.shape(1), ndarray.shape(2), 8, full_buffer);
+                } else {
+                    printf("[WARNING] Subframe was Empty or Invalid!");// From camera : % i\n", frame->GetCamera()->Serial());
+                }
+            }
+        }else{
+            printf("[WARNING] Framegroup is a nullptr or has an invalid number of cameras!\n");
+        }
+        nanobind::gil_scoped_acquire acquire;
+    });
+
     nb::enum_<Core::eVideoMode>(m, "eVideoMode")
         .value("SegmentMode"  , Core::eVideoMode::SegmentMode)
         .value("GrayscaleMode", Core::eVideoMode::GrayscaleMode)
